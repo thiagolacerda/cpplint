@@ -5481,7 +5481,7 @@ for _header, _templates in _HEADERS_CONTAINING_TEMPLATES:
          _header))
 
 
-def FilesBelongToSameModule(filename_cc, filename_h):
+def FilesBelongToSameModule(filename_cc, file_extension, filename_h):
   """Check if these two filenames belong to the same module.
 
   The concept of a 'module' here is a as follows:
@@ -5502,7 +5502,8 @@ def FilesBelongToSameModule(filename_cc, filename_h):
   some false positives. This should be sufficiently rare in practice.
 
   Args:
-    filename_cc: is the path for the .cc file
+    filename_cc: is the path for the c++ implementation file
+    file_extension: the c++ file extension (can be .cc or .cpp)
     filename_h: is the path for the header path
 
   Returns:
@@ -5511,9 +5512,9 @@ def FilesBelongToSameModule(filename_cc, filename_h):
     string: the additional prefix needed to open the header file.
   """
 
-  if not filename_cc.endswith('.cc'):
+  if file_extension != 'cc' and file_extension != 'cpp':
     return (False, '')
-  filename_cc = filename_cc[:-len('.cc')]
+  filename_cc = filename_cc[:-(len(file_extension) + 1)]
   if filename_cc.endswith('_unittest'):
     filename_cc = filename_cc[:-len('_unittest')]
   elif filename_cc.endswith('_test'):
@@ -5563,7 +5564,7 @@ def UpdateIncludeState(filename, include_dict, io=codecs):
   return True
 
 
-def CheckForIncludeWhatYouUse(filename, clean_lines, include_state, error,
+def CheckForIncludeWhatYouUse(filename, file_extension, clean_lines, include_state, error,
                               io=codecs):
   """Reports for missing stl includes.
 
@@ -5575,6 +5576,7 @@ def CheckForIncludeWhatYouUse(filename, clean_lines, include_state, error,
 
   Args:
     filename: The name of the current file.
+    file_extension: The extension of the file
     clean_lines: A CleansedLines instance containing the file.
     include_state: An _IncludeState instance.
     error: The function to call with any errors found.
@@ -5635,7 +5637,7 @@ def CheckForIncludeWhatYouUse(filename, clean_lines, include_state, error,
   # the keys.
   header_keys = include_dict.keys()
   for header in header_keys:
-    (same_module, common_path) = FilesBelongToSameModule(abs_filename, header)
+    (same_module, common_path) = FilesBelongToSameModule(abs_filename, file_extension, header)
     fullpath = common_path + header
     if same_module and UpdateIncludeState(fullpath, include_dict, io):
       header_found = True
@@ -5645,7 +5647,7 @@ def CheckForIncludeWhatYouUse(filename, clean_lines, include_state, error,
   # didn't include it in the .h file.
   # TODO(unknown): Do a better job of finding .h files so we are confident that
   # not having the .h file means there isn't one.
-  if filename.endswith('.cc') and not header_found:
+  if (file_extension == 'cc' or file_extension == 'cpp') and not header_found:
     return
 
   # All the lines have been processed, report the errors found.
@@ -5995,10 +5997,10 @@ def ProcessFileData(filename, file_extension, lines, error,
     FlagCxx11Features(filename, clean_lines, line, error)
   nesting_state.CheckCompletedBlocks(filename, error)
 
-  CheckForIncludeWhatYouUse(filename, clean_lines, include_state, error)
+  CheckForIncludeWhatYouUse(filename, file_extension, clean_lines, include_state, error)
   
   # Check that the .cc file has included its header if it exists.
-  if file_extension == 'cc':
+  if file_extension == 'cc' or file_extension == 'cpp':
     CheckHeaderFileIncluded(filename, include_state, error)
 
   # We check here rather than inside ProcessLine so that we see raw
