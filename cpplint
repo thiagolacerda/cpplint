@@ -3870,9 +3870,14 @@ def CheckBraces(filename, clean_lines, linenum, error):
     # one line control statement was previous.
     prevline = clean_lines.elided[linenum - 2]
     last_open_brace = prevline.rfind('{')
-    if (last_open_brace != -1 and prevline.find('}', last_open_brace) == -1
-        and Search(r'\b(if|for|while|else)\b', prevline)):
-      error(filename, linenum, 'whitespace/braces', 4, 'One line control clauses should not use braces.')
+    if (last_open_brace != -1 and prevline.find('}', last_open_brace) == -1):
+      if Search(r'\b(if)\b', prevline):
+        if not Search(r'\b(else)\b', line) or (Match(r'\s*}\s*else\s*{', line) and Match(r'\s*}\s*', clean_lines.elided[linenum + 2])):
+          error(filename, linenum, 'whitespace/braces', 4, 'One line control clauses should not use braces.')
+      elif Search(r'\b(else)\b', prevline) and Search(r'\b(if)\b', clean_lines.elided[linenum - 4]):
+        error(filename, linenum, 'whitespace/braces', 4, 'One line control clauses should not use braces.')
+      elif Search(r'\b(for|while)\b', prevline):
+        error(filename, linenum, 'whitespace/braces', 4, 'One line control clauses should not use braces.')
 
   # An else clause should be on the same line as the preceding closing brace.
   if Match(r'\s*else\b\s*(?:if\b|\{|$)', line):
