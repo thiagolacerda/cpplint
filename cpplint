@@ -3843,18 +3843,36 @@ def CheckBraces(filename, clean_lines, linenum, error):
   line = clean_lines.elided[linenum]        # get rid of comments and strings
 
   if Match(r'\s*{\s*$', line):
-    # We allow an open brace to start a line in the case where someone is using
-    # braces in a block to explicitly create a new scope, which is commonly used
-    # to control the lifetime of stack-allocated variables.  Braces are also
-    # used for brace initializers inside function calls.  We don't detect this
-    # perfectly: we just don't complain if the last non-whitespace character on
-    # the previous non-blank line is ',', ';', ':', '(', '{', or '}', or if the
-    # previous line starts a preprocessor block.
+    # We allow an open brace to start a line in the case where someone
+    # is using braces for function definition or in a block to
+    # explicitly create a new scope, which is commonly used to control
+    # the lifetime of stack-allocated variables.  We don't detect this
+    # perfectly: we just don't complain if the last non-whitespace
+    # character on the previous non-blank line is ';', ':', '{', '}',
+    # ')', or ') const' and doesn't begin with 'if|for|while|switch|else'.
+    # We also allow '#' for #endif and '=' for array initialization,
+    # and '- (' and '+ (' for Objective-C methods.
     prevline = GetPreviousNonBlankLine(clean_lines, linenum)[0]
-    if (not Search(r'[,;:}{(]\s*$', prevline) and
-        not Match(r'\s*#', prevline)):
-      error(filename, linenum, 'whitespace/braces', 4,
-            '{ should almost always be at the end of the previous line')
+    if ((not Search(r'[;:}{)=]\s*$|\)\s*((const|override|const override)\s*)?(->\s*\S+)?\s*$', prevline)
+         or Search(r'\b(if|for|while|switch|else|NS_ENUM)\b', prevline))
+        and prevline.find('#') < 0
+        and prevline.find('- (') != 0
+        and prevline.find('+ (') != 0):
+      error(filename, linenum, 'whitespace/braces', 4, 'This { should be at the end of the previous line')
+  elif (Search(r'\)\s*(((const|override)\s*)*\s*)?{\s*$', line)
+        and line.count('(') == line.count(')')
+        and not Search(r'\b(if|for|while|switch|NS_ENUM)\b', line)
+        and not Match(r'\s+[A-Z_][A-Z_0-9]+\b', line)):
+    error(filename, linenum, 'whitespace/braces', 4, 'Place brace on its own line for function definitions.')
+
+  if (Match(r'\s*}\s*(else\s*({\s*)?)?$', line) and linenum > 1):
+    # We check if a closed brace has started a line to see if a
+    # one line control statement was previous.
+    prevline = clean_lines.elided[linenum - 2]
+    last_open_brace = prevline.rfind('{')
+    if (last_open_brace != -1 and prevline.find('}', last_open_brace) == -1
+        and Search(r'\b(if|for|while|else)\b', prevline)):
+      error(filename, linenum, 'whitespace/braces', 4, 'One line control clauses should not use braces.')
 
   # An else clause should be on the same line as the preceding closing brace.
   if Match(r'\s*else\b\s*(?:if\b|\{|$)', line):
